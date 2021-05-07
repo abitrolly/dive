@@ -2,14 +2,21 @@ package key
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/awesome-gocui/gocui"
-	"github.com/awesome-gocui/keybinding"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/wagoodman/dive/runtime/ui/format"
 )
+
+type ShortCut struct {
+	// tcell.Key, which is just int16, the code from tcell table of keys, but also ?KeyRune (confusing)
+	Key gocui.Key
+	// tcell.ModMask, which is also int16, and a bit mask for Shift, Ctrl, Alt
+	Modifier gocui.Modifier
+}
 
 type BindingInfo struct {
 	Key        gocui.Key
@@ -21,7 +28,7 @@ type BindingInfo struct {
 }
 
 type Binding struct {
-	key         []keybinding.Key
+	key         []ShortCut
 	displayName string
 	selectedFn  func() bool
 	actionFn    func() error
@@ -54,11 +61,11 @@ func GenerateBindings(gui *gocui.Gui, influence string, infos []BindingInfo) ([]
 }
 
 func NewBinding(gui *gocui.Gui, influence string, key gocui.Key, mod gocui.Modifier, displayName string, actionFn func() error) (*Binding, error) {
-	return newBinding(gui, influence, []keybinding.Key{{Value: key, Modifier: mod}}, displayName, actionFn)
+	return newBinding(gui, influence, []ShortCut{{Key: key, Modifier: mod}}, displayName, actionFn)
 }
 
 func NewBindingFromConfig(gui *gocui.Gui, influence string, configKeys []string, displayName string, actionFn func() error) (*Binding, error) {
-	var parsedKeys []keybinding.Key
+	var parsedKeys []ShortCut
 	for _, configKey := range configKeys {
 		bindStr := viper.GetString(configKey)
 		if bindStr == "" {
@@ -67,7 +74,7 @@ func NewBindingFromConfig(gui *gocui.Gui, influence string, configKeys []string,
 		}
 		logrus.Debugf("parsing keybinding '%s' --> '%s'", configKey, bindStr)
 
-		keys, err := keybinding.ParseAll(bindStr)
+		keys, mod, err := gocui.ParseAll(strings.Split(bindStr, ","))
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +91,7 @@ func NewBindingFromConfig(gui *gocui.Gui, influence string, configKeys []string,
 	return newBinding(gui, influence, parsedKeys, displayName, actionFn)
 }
 
-func newBinding(gui *gocui.Gui, influence string, keys []keybinding.Key, displayName string, actionFn func() error) (*Binding, error) {
+func newBinding(gui *gocui.Gui, influence string, keys []ShortCut, displayName string, actionFn func() error) (*Binding, error) {
 	binding := &Binding{
 		key:         keys,
 		displayName: displayName,
